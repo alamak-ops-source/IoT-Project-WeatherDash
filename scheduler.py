@@ -25,4 +25,4 @@ def start():
         # Print alive message every 2 minutes
         current_time = datetime.now(ZoneInfo("Asia/Kuala_Lumpur"))
         print(f"[{current_time.strftime('%Y-%m-%d %H:%M:%S')}] [Scheduler] App is running...")
-        time.sleep(120)  
+        time.sleep(1)  
