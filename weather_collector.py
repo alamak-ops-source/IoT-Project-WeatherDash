@@ -2,6 +2,8 @@
 import requests
 import sqlite3
 from datetime import datetime
+from zoneinfo import ZoneInfo  # Top of the file
+
 
 # API URLs
 forecast_url = "https://api.open-meteo.com/v1/forecast?latitude=3.139&longitude=101.6869&hourly=temperature_2m,precipitation_probability,wind_speed_10m&timezone=Asia%2FKuala_Lumpur"
@@ -27,7 +29,9 @@ forecast = requests.get(forecast_url).json()
 current = requests.get(current_url).json()
 
 # Extract current hour timestamp
-now = datetime.now().strftime("%Y-%m-%dT%H:00")
+malaysia_time = datetime.now(ZoneInfo("Asia/Kuala_Lumpur"))
+now = malaysia_time.strftime("%Y-%m-%dT%H:00")
+
 
 # Extract matching forecast data
 forecast_temp = forecast['hourly']['temperature_2m'][forecast['hourly']['time'].index(now)]
