@@ -110,3 +110,5 @@ if __name__ == '__main__':
     collect_weather_data()  # Run once at startup
     start_background_tasks()  # Start scheduler in background
     app.run(debug=True)
+        port = int(os.environ.get('PORT', 10000))
+    app.run(host='0.0.0.0', port=port)
