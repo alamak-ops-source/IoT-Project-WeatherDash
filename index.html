@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>WeatherDash</title>
+  <link rel="icon" type="image/png" href="/static/WeatherDash-logo.png">
+  <meta name="viewport" content="width=1324">
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+<div class="app">
+  <!-- Sidebar -->
+  <div class="sidebar">
+    <div class="sidebar-header">
+      <div class="logo">
+        <div class="logo-icon">☁</div>
+        <span class="logo-text">WeatherDash</span>
+      </div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-item active"><a href="/" class="nav-item"><span class="nav-label">Dashboard</span></a></div>
+      <div class="nav-item"><a href="/analysis" class="nav-item"><span class="nav-label">Analysis</span></a></div>
+      <div class="nav-item"><a href="/database" class="nav-item"><span class="nav-label">Database</span></a></div>
+      <div class="nav-item"><a href="/mse" class="nav-item"><span class="nav-label">MSE</span></a></div>
+      <div class="nav-item"><a href="/about" class="nav-item"><span class="nav-label">About Us</span></a></div>
+    </nav>
+  </div>
+
+  <!-- Main Content -->
+  <div class="main-content">
+    <div class="dashboard-header">
+      <h1>WeatherDash</h1>
+      <div class="mse-display" id="mse-box"></div>
+    </div>
+
+    <div class="dashboard-content">
+      <!-- Weather Card -->
+      <div class="chart-container" id="weather-card" style="margin-top: 0px;">
+        <h2 style="margin-bottom: 20px;">Current Weather</h2>
+        <div class="weather-details">
+          <p><strong>Location:</strong> Kuala Lumpur</p>
+          <p><strong>Date:</strong> <span id="weather-date">--</span></p>
+          <p><strong>Temperature:</strong> <span id="weather-temp">--°C</span></p>
+          <p><strong>Wind Speed:</strong> <span id="weather-wind">-- km/h</span></p>
+        </div>
+      </div>
+
+      <!-- Range Picker Section (moved to below charts) -->
+      <div class="chart-container">
+  <div class="chart-header">
+    <h2>Filter Chart by Date Range</h2>
+  </div>
+  <div class="chart-date-filter">
+    <div class="date-field">
+      <label for="range-start">From :</label>
+      <input type="date" id="range-start">
+    </div>
+    <div class="date-field">
+      <label for="range-end">To :</label>
+      <input type="date" id="range-end">
+    </div>
+    <div class="btn-group">
+      <button id="range-apply">Apply</button>
+      <button id="range-reset">Reset</button>
+    </div>
+  </div>
+</div>
+
+      <!-- Temperature Chart -->
+      <div class="chart-container">
+        <div class="chart-header">
+          <h2>Forecast vs Actual Temperature (°C)</h2>
+        </div>
+        <div class="chart-wrapper">
+          <canvas id="tempChart"></canvas>
+        </div>
+      </div>
+
+      <!-- Wind Speed Chart -->
+      <div class="chart-container">
+        <div class="chart-header">
+          <h2>Wind Speed Comparison (km/h)</h2>
+        </div>
+        <div class="chart-wrapper">
+          <canvas id="windChart"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Status Message -->
+<div id="collector-message" class="status-message"></div>
+
+<script>
+let allData = [];
+let tempChart, windChart;
+
+// Fetch and render all data initially
+fetch('/data')
+  .then(res => res.json())
+  .then(data => {
+    allData = data;
+    renderCharts(data);
+  });
+
+function renderCharts(data) {
+  const labels = data.map(row => row.timestamp);
+  const forecastTemp = data.map(row => row.forecast_temp);
+  const actualTemp = data.map(row => row.actual_temp);
+  const forecastWind = data.map(row => row.forecast_wind);
+  const actualWind = data.map(row => row.actual_wind);
+
+  if (tempChart) tempChart.destroy();
+  if (windChart) windChart.destroy();
+
+  Chart.defaults.color = '#cbd5e1';
+  Chart.defaults.borderColor = '#334155';
+
+  tempChart = new Chart(document.getElementById("tempChart"), {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        { label: "Forecast Temp", data: forecastTemp, borderColor: '#3b82f6', borderWidth: 3, fill: false },
+        { label: "Actual Temp", data: actualTemp, borderColor: '#ef4444', borderWidth: 3, fill: false }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+  legend: {
+    display: true,
+    labels: {
+      usePointStyle: true,
+      boxWidth: 12,
+      color: '#cbd5e1'
+    }
+  }
+},
+
+      scales: {
+        x: { grid: { color: '#334155' }, ticks: { autoSkip: true, maxTicksLimit: 10 } },
+        y: { grid: { color: '#334155' } }
+      }
+    }
+  });
+
+  windChart = new Chart(document.getElementById("windChart"), {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        { label: "Forecast Wind", data: forecastWind, borderColor: '#10b981', borderWidth: 3, fill: false },
+        { label: "Actual Wind", data: actualWind, borderColor: '#f59e0b', borderWidth: 3, fill: false }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+  legend: {
+    display: true,
+    labels: {
+      usePointStyle: true,
+      boxWidth: 12,
+      color: '#cbd5e1'
+    }
+  }
+},
+
+      scales: {
+        x: { grid: { color: '#334155' }, ticks: { autoSkip: true, maxTicksLimit: 10 } },
+        y: { grid: { color: '#334155' } }
+      }
+    }
+  });
+}
+
+// Handle Apply button for date range
+document.getElementById('range-apply').addEventListener('click', () => {
+  const start = document.getElementById('range-start').value;
+  const end = document.getElementById('range-end').value;
+
+  if (!start || !end) {
+    renderCharts(allData); // fallback
+    return;
+  }
+
+  const filtered = allData.filter(row => {
+    const date = row.timestamp.split('T')[0];
+    return date >= start && date <= end;
+  });
+
+  renderCharts(filtered);
+});
+
+// Fetch MSE
+fetch('/mse-endpoint')
+  .then(res => res.json())
+  .then(mse => {
+    document.getElementById("mse-box").innerHTML = `
+      <div class="mse-item clickable" id="trigger-collector">
+        <span class="mse-label">Time Retrieve:</span>
+        <span class="mse-value" id="weather-time">--:--</span>
+      </div>
+      <div class="mse-item">
+        <span class="mse-label">Temperature MSE</span>
+        <span class="mse-value">${mse.mse_temperature.toFixed(3)}</span>
+      </div>
+      <div class="mse-item">
+        <span class="mse-label">Wind MSE</span>
+        <span class="mse-value">${mse.mse_wind.toFixed(3)}</span>
+      </div>`;
+  });
+
+// Fetch current weather
+fetch('https://api.open-meteo.com/v1/forecast?latitude=3.139&longitude=101.6869&current=temperature_2m,wind_speed_10m,weathercode&timezone=Asia%2FKuala_Lumpur')
+  .then(res => res.json())
+  .then(data => {
+    const current = data.current;
+    document.getElementById('weather-temp').textContent = current.temperature_2m + ' °C';
+    document.getElementById('weather-wind').textContent = current.wind_speed_10m + ' km/h';
+
+    const timeObj = new Date(current.time);
+    const optionsTime = { hour: 'numeric', minute: 'numeric', hour12: true };
+    const optionsDate = { day: 'numeric', month: 'long', year: 'numeric' };
+
+    document.getElementById('weather-time').textContent = timeObj.toLocaleTimeString('en-MY', optionsTime).toUpperCase();
+    document.getElementById('weather-date').textContent = timeObj.toLocaleDateString('en-MY', optionsDate);
+  });
+
+// Collector trigger
+document.addEventListener("click", function (e) {
+  if (e.target.closest("#trigger-collector")) {
+    fetch('/run-collector')
+      .then(res => res.json())
+      .then(res => showCollectorMessage(res.message, true))
+      .catch(() => showCollectorMessage("Failed to run collector.", false));
+  }
+});
+
+function showCollectorMessage(message, success = true) {
+  const msgBox = document.getElementById("collector-message");
+  msgBox.textContent = message;
+  msgBox.className = `status-message ${success ? "success" : "error"}`;
+  msgBox.style.display = "block";
+  setTimeout(() => { msgBox.style.display = "none"; }, 5000);
+}
+
+// Reset button: clear range + re-render full chart
+document.getElementById('range-reset').addEventListener('click', () => {
+  document.getElementById('range-start').value = '';
+  document.getElementById('range-end').value = '';
+  renderCharts(allData); // Reset to full dataset
+});
+
+</script>
+</body>
+</html>

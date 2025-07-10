@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=1324">
+  <title>Analysis - WeatherDash</title>
+  <link rel="icon" type="image/png" href="/static/WeatherDash-logo.png">
+  <link rel="stylesheet" href="/static/style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+<div class="app">
+  <!-- Sidebar -->
+  <div class="sidebar">
+    <div class="sidebar-header">
+      <div class="logo">
+        <div class="logo-icon">☁</div>
+        <span class="logo-text">WeatherDash</span>
+      </div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-item"><a href="/" class="nav-item"><span class="nav-label">Dashboard</span></a></div>
+      <div class="nav-item active"><a href="/analysis" class="nav-item"><span class="nav-label">Analysis</span></a></div>
+      <div class="nav-item"><a href="/database" class="nav-item"><span class="nav-label">Database</span></a></div>
+      <div class="nav-item"><a href="/mse" class="nav-item"><span class="nav-label">MSE</span></a></div>
+      <div class="nav-item"><a href="/about" class="nav-item"><span class="nav-label">About Us</span></a></div>
+    </nav>
+  </div>
+
+  <!-- Main Content -->
+  <div class="main-content">
+    <div class="dashboard-header">
+      <h1>WeatherDash Analysis</h1>
+    </div>
+    <div class="dashboard-content">
+<div class="chart-container">
+  <div class="chart-header">
+    <h2>Filter Chart by Date Range</h2>
+  </div>
+  <div class="chart-date-filter">
+    <div class="date-field">
+      <label for="range-start">From :</label>
+      <input type="date" id="range-start">
+    </div>
+    <div class="date-field">
+      <label for="range-end">To :</label>
+      <input type="date" id="range-end">
+    </div>
+    <div class="btn-group">
+      <button id="range-apply">Apply</button>
+      <button id="range-reset">Reset</button>
+    </div>
+  </div>
+</div>
+      <!-- Section 1: Absolute Difference Bar Chart -->
+<div class="chart-container">
+  <div class="chart-header">
+    <h2>Absolute Difference: Forecast vs Actual</h2>
+  </div>
+  <p style="margin-bottom: 16px; color: #cbd5e1; font-size: 14px; text-align: justify;">
+    This chart displays the absolute difference between the forecasted and actual values of temperature and wind speed. It highlights the magnitude of forecasting errors at each recorded time, helping identify specific periods where predictions deviated significantly from real-world observations. Lower bars indicate better forecasting accuracy, while taller bars reveal larger discrepancies.
+  </p>
+  <div class="chart-wrapper chart-analysis">
+    <canvas id="barDiffChart"></canvas>
+  </div>
+</div>
+
+
+      <!-- Section 2: Cumulative Forecast Error Area Chart -->
+<div class="chart-container">
+  <div class="chart-header"><h2>Cumulative Forecast Error (Temperature)</h2></div>
+  <p style="margin-bottom: 16px; color: #cbd5e1; font-size: 14px; text-align: justify;">
+    This area chart visualizes the cumulative forecast error for temperature over time. It helps track how forecast inaccuracies accumulate, indicating periods where errors consistently occurred or improved. A flatter curve suggests more accurate forecasts, while a steep incline reveals growing deviation.
+  </p>
+  <div class="chart-wrapper chart-analysis"><canvas id="areaCumulativeChart"></canvas></div>
+</div>
+
+<!-- Section 3: Trend Detection -->
+<div class="chart-container">
+  <div class="chart-header"><h2>Trend Detection (7-point moving avg)</h2></div>
+  <p style="margin-bottom: 16px; color: #cbd5e1; font-size: 14px; text-align: justify;">
+    This line chart applies a 7-point moving average to both forecasted and actual temperatures. It smooths out short-term fluctuations to reveal broader trends in the data, helping identify patterns such as warming or cooling periods, as well as the alignment or divergence between forecast and reality.
+  </p>
+  <div class="chart-wrapper chart-analysis"><canvas id="trendChart"></canvas></div>
+</div>
+
+<!-- Section 4: Real-Time vs Historical Deviation -->
+<div class="chart-container">
+  <div class="chart-header"><h2>Real-Time vs Historical Deviation</h2></div>
+  <p style="margin-bottom: 16px; color: #cbd5e1; font-size: 14px; text-align: justify;">
+    This chart compares current forecast deviations against an assumed historical average error threshold. Bars above the baseline indicate larger-than-expected forecast errors at specific times, helping highlight outliers and assess model stability under real-time conditions.
+  </p>
+  <div class="chart-wrapper chart-analysis"><canvas id="deviationChart"></canvas></div>
+</div>
+
+<!-- Section 5: Daily Summary -->
+<div class="chart-container">
+  <div class="chart-header"><h2>Daily Forecast Summary</h2></div>
+  <p style="margin-bottom: 16px; color: #cbd5e1; font-size: 14px; text-align: justify;">
+    This table summarizes daily averages for both forecasted and actual temperature and wind speed. It provides a compact overview of overall prediction performance across each day, allowing easy comparison and identifying which days had more accurate or less accurate forecasting outcomes.
+  </p>
+  <div class="table-wrapper">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Avg Forecast Temp</th>
+          <th>Avg Actual Temp</th>
+          <th>Avg Forecast Wind</th>
+          <th>Avg Actual Wind</th>
+        </tr>
+      </thead>
+      <tbody id="summary-table"></tbody>
+    </table>
+  </div>
+</div>
+
+
+    </div>
+  </div>
+</div>
+
+<!-- Script: Fetch and Generate Charts -->
+<script>
+let allData = [];
+
+fetch('/data')
+  .then(res => res.json())
+  .then(data => {
+    allData = data;
+    renderAllCharts(allData);
+  });
+
+let barChart, areaChart, trendChart, devChart;
+
+function renderAllCharts(data) {
+  const labels = data.map(d => {
+    const dt = new Date(d.timestamp);
+    return dt.toLocaleString('en-MY', {
+      day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hour12: true
+    });
+  });
+
+  const forecastTemp = data.map(d => d.forecast_temp);
+  const actualTemp = data.map(d => d.actual_temp);
+  const forecastWind = data.map(d => d.forecast_wind);
+  const actualWind = data.map(d => d.actual_wind);
+
+  if (barChart) barChart.destroy();
+  if (areaChart) areaChart.destroy();
+  if (trendChart) trendChart.destroy();
+  if (devChart) devChart.destroy();
+
+  // 1. Absolute Difference
+  const absTempDiff = forecastTemp.map((v, i) => Math.abs(v - actualTemp[i]));
+  barChart = new Chart(document.getElementById('barDiffChart'), {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Abs Temp Diff (°C)',
+        data: absTempDiff,
+        backgroundColor: '#f59e0b'
+      }]
+    },
+    options: { responsive: true }
+  });
+
+  // 2. Cumulative Error
+  let cumulativeError = [];
+  forecastTemp.reduce((acc, curr, i) => {
+    const diff = Math.abs(curr - actualTemp[i]);
+    acc += diff;
+    cumulativeError.push(acc);
+    return acc;
+  }, 0);
+  areaChart = new Chart(document.getElementById('areaCumulativeChart'), {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Cumulative Error',
+        data: cumulativeError,
+        fill: true,
+        backgroundColor: 'rgba(59,130,246,0.2)',
+        borderColor: '#3b82f6'
+      }]
+    },
+    options: { responsive: true }
+  });
+
+  // 3. Trend Detection
+  const movingAverage = (arr, n) => arr.map((_, i, a) => {
+    const start = Math.max(0, i - n + 1);
+    const subset = a.slice(start, i + 1);
+    return subset.reduce((sum, v) => sum + v, 0) / subset.length;
+  });
+
+  trendChart = new Chart(document.getElementById('trendChart'), {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: 'Forecast Temp (MA)',
+          data: movingAverage(forecastTemp, 7),
+          borderColor: '#10b981',
+          fill: false
+        },
+        {
+          label: 'Actual Temp (MA)',
+          data: movingAverage(actualTemp, 7),
+          borderColor: '#ef4444',
+          fill: false
+        }
+      ]
+    },
+    options: { responsive: true }
+  });
+
+  // 4. Real-Time Deviation
+  const deviation = forecastTemp.map((v, i) => Math.abs(v - actualTemp[i]) - 1.5);
+  devChart = new Chart(document.getElementById('deviationChart'), {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Deviation from Historical Avg',
+        data: deviation,
+        backgroundColor: '#8b5cf6'
+      }]
+    },
+    options: { responsive: true }
+  });
+
+  // 5. Daily Summary Table
+  const summaryMap = {};
+  data.forEach(row => {
+    const date = new Date(row.timestamp).toLocaleDateString('en-MY', {
+      day: 'numeric', month: 'long', year: 'numeric'
+    });
+    if (!summaryMap[date]) summaryMap[date] = { count: 0, ft: 0, at: 0, fw: 0, aw: 0 };
+    summaryMap[date].count++;
+    summaryMap[date].ft += row.forecast_temp;
+    summaryMap[date].at += row.actual_temp;
+    summaryMap[date].fw += row.forecast_wind;
+    summaryMap[date].aw += row.actual_wind;
+  });
+
+  const summaryTable = document.getElementById("summary-table");
+  summaryTable.innerHTML = '';
+  Object.entries(summaryMap).forEach(([date, v]) => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${date}</td>
+      <td>${(v.ft / v.count).toFixed(1)}°C</td>
+      <td>${(v.at / v.count).toFixed(1)}°C</td>
+      <td>${(v.fw / v.count).toFixed(1)} km/h</td>
+      <td>${(v.aw / v.count).toFixed(1)} km/h</td>
+    `;
+    summaryTable.appendChild(tr);
+  });
+}
+
+// Apply filter
+document.getElementById('range-apply').addEventListener('click', () => {
+  const start = document.getElementById('range-start').value;
+  const end = document.getElementById('range-end').value;
+
+  if (!start || !end) return;
+
+  const filtered = allData.filter(row => {
+    const dateOnly = row.timestamp.split('T')[0];
+    return dateOnly >= start && dateOnly <= end;
+  });
+
+  renderAllCharts(filtered);
+});
+
+// Reset filter
+document.getElementById('range-reset').addEventListener('click', () => {
+  document.getElementById('range-start').value = '';
+  document.getElementById('range-end').value = '';
+  renderAllCharts(allData);
+});
+</script>
+
+</body>
+</html>

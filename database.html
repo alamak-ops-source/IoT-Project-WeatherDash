@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1324">
+  <title>Database - WeatherDash</title>
+  <link rel="icon" type="image/png" href="/static/WeatherDash-logo.png">
+
+  <!-- Your custom dark dashboard styles -->
+  <link rel="stylesheet" href="/static/style.css">
+
+  <!-- jQuery (required first for DataTables) -->
+  <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+
+  <!-- DataTables dark theme -->
+  <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.dark.min.css">
+  <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+</head>
+
+<body>
+<div class="app">
+  <!-- Sidebar -->
+  <div class="sidebar">
+    <div class="sidebar-header">
+      <div class="logo">
+        <div class="logo-icon">☁</div>
+        <span class="logo-text">WeatherDash</span>
+      </div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-item"><a href="/" class="nav-item"><span class="nav-label">Dashboard</span></a></div>
+      <div class="nav-item"><a href="/analysis" class="nav-item"><span class="nav-label">Analysis</span></a></div>
+      <div class="nav-item active"><a href="/database" class="nav-item"><span class="nav-label">Database</span></a></div>
+      <div class="nav-item"><a href="/mse" class="nav-item"><span class="nav-label">MSE</span></a></div>
+      <div class="nav-item"><a href="/about" class="nav-item"><span class="nav-label">About Us</span></a></div>
+    </nav>
+  </div>
+
+  <!-- Main Content -->
+  <div class="main-content">
+    <div class="dashboard-header">
+      <h1>WeatherDash Database</h1>
+    </div>
+    <div class="content-grid">
+      <div class="left-content">
+        <div class="chart-container">
+          <h1>Weather Database</h1>
+          <p>
+            Below is the historical weather data collected from forecasts and actual readings. Use this table to analyze performance and trends.
+          </p>
+          <!-- Data Table Section -->
+          <div class="table-container">
+            <div class="chart-header">
+            <h2></h2>
+              
+            </div>
+          <div>
+            <div class="table-wrapper">
+                <table id="weather-table" class="display data-table" style="width:100%">
+                <thead>
+                  <tr>
+                    <th>No.</th>
+                    <th>Date</th>
+                    <th>Time</th>
+                    <th>Forecast Temp</th>
+                    <th>Actual Temp</th>
+                    <th>Forecast Wind</th>
+                    <th>Actual Wind</th>
+                  </tr>
+                </thead>
+                <tbody id="data-table"></tbody>
+              </table>
+            </div>
+            <div class="table-footer">
+  <button id="download-btn" class="download-btn">Download Data</button>
+</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Script to load and format data -->
+<script>
+  fetch('/data')
+    .then(res => res.json())
+    .then(data => {
+      const tableBody = document.getElementById('data-table');
+      data.forEach(row => {
+    const dateObj = new Date(row.timestamp);
+
+    // Raw values
+    const rawDate = `${dateObj.getFullYear()}-${(dateObj.getMonth()+1).toString().padStart(2, '0')}-${dateObj.getDate().toString().padStart(2, '0')}`;
+    const rawTime = dateObj.toTimeString().slice(0, 5);   // e.g. 20:00
+
+    // Extract raw date parts
+    const day = dateObj.getDate().toString();            // "8"
+    const month = dateObj.toLocaleString('en-MY', { month: 'long' }); // "July"
+    const year = dateObj.getFullYear().toString();       // "2025"
+
+    // Join them manually
+    const formattedDate = `${day} ${month} ${year}`;     // "8 July 2025"
+    const searchableDate = `${day}${month}${year}`;      // "8July2025"
+
+    const formattedTime = dateObj.toLocaleTimeString('en-MY', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
+    }).toUpperCase();
+
+    const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${row.id}</td>
+        <td data-date="${rawDate}">${formattedDate}</td>
+        <td data-search="${rawTime} ${formattedTime}">${formattedTime}</td>
+        <td>${row.forecast_temp}°C</td>
+        <td>${row.actual_temp}°C</td>
+        <td>${row.forecast_wind} km/h</td>
+        <td>${row.actual_wind} km/h</td>
+      `;
+
+    tableBody.appendChild(tr);
+    });
+    // Initialize DataTable after table is built
+     const table = $('#weather-table').DataTable({
+      paging: true,
+      searching: true,
+      ordering: true,
+      responsive: true
+    });
+
+    // Set placeholder inside search box (remove "Search:" label)
+    $('.dataTables_filter label').contents().filter(function () {
+      return this.nodeType === 3; // nodeType 3 is text
+    }).remove(); // remove "Search:" text
+
+    $('.dataTables_filter input')
+      .attr('placeholder', 'Search date, time, or value...')
+      .removeAttr('aria-controls');
+    
+    // Listen to date picker changes
+    $('#date-filter').on('change', function () {
+      selectedDate = this.value; // yyyy-mm-dd
+      $('#weather-table').DataTable().draw(); // redraw table to apply filter
+    });
+
+    // Inject date picker beside search bar
+$('<input type="date" id="date-filter" />').appendTo('.dataTables_filter').css({
+  'margin-left': '16px',
+  'padding': '10px 14px',
+  'border-radius': '8px',
+  'background-color': '#1e293b',
+  'color': '#f8fafc',
+  'border': '1px solid #334155',
+  'font-size': '14px',
+  'outline': 'none'
+});
+
+$(document).on('change', '#date-filter', function () {
+  selectedDate = this.value; // yyyy-mm-dd
+  $('#weather-table').DataTable().draw();
+});
+
+
+  });
+
+  // Calendar date picker filtering
+let selectedDate = null; // store selected date globally
+
+// Hook into DataTables' custom search
+$.fn.dataTable.ext.search.push(function(settings, data, dataIndex, rowData, counter) {
+  if (!selectedDate) return true;
+
+  // Get raw date from the rendered <td data-date="">
+  const row = $('#weather-table').DataTable().row(dataIndex).node();
+  const rowDate = row.querySelector('td[data-date]')?.getAttribute('data-date');
+
+  return rowDate === selectedDate;
+});
+
+// Download button
+document.getElementById("download-btn").addEventListener("click", () => {
+  window.location.href = "/download";
+});
+</script>
+</body>
+</html>

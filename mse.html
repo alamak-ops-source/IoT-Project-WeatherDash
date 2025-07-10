@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1324">
+  <title>MSE - WeatherDash</title>
+  <link rel="icon" type="image/png" href="/static/WeatherDash-logo.png">
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+  <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+  <style>
+  .mse-display {
+    display: flex;
+    gap: 16px;
+    margin-top: 16px;
+  }
+
+  .mse-item {
+    flex: 1;
+    padding: 20px;
+    border-radius: 8px;
+    background-color: #0f172a;
+  }
+
+  @media (max-width: 768px) {
+    .mse-display {
+      flex-direction: column;
+    }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- Sidebar -->
+  <div class="sidebar">
+    <div class="sidebar-header">
+      <div class="logo">
+        <div class="logo-icon">☁</div>
+        <span class="logo-text">WeatherDash</span>
+      </div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-item"><a href="/" class="nav-item"><span class="nav-label">Dashboard</span></a></div>
+      <div class="nav-item"><a href="/analysis" class="nav-item"><span class="nav-label">Analysis</span></a></div>
+      <div class="nav-item"><a href="/database" class="nav-item"><span class="nav-label">Database</span></a></div>
+      <div class="nav-item active"><a href="/mse" class="nav-item"><span class="nav-label">MSE</span></a></div>
+      <div class="nav-item"><a href="/about" class="nav-item"><span class="nav-label">About Us</span></a></div>
+    </nav>
+  </div>
+
+  <!-- Main Content -->
+  <div class="main-content">
+    <div class="dashboard-header">
+      <h1>WeatherDash Forecast Accuracy (MSE)</h1>
+    </div>
+    <div class="content-grid">
+      <div class="left-content">
+        <div class="chart-container">
+          <h1>Mean Squared Error (MSE)</h1>
+                <p style="margin-bottom: 10px;">
+                Mean Squared Error (MSE) is a common metric used to measure the accuracy of predictions. It calculates the average of the squares of the differences between the predicted (forecasted) and actual values:
+                </p>
+                <div class="mse-item" style="background-color: #0f172a;">
+                <p style="font-size: 14px;">The formula for Mean Squared Error (MSE)</p>
+                <br>
+                <p style="font-size: 40px;">$$\text{MSE} = \frac{1}{n} \sum_{i=1}^{n} (\hat{y}_i - y_i)^2$$</p>
+
+                <p style="margin-top: 6px; font-size: 14px; line-height: 1.6; text-align: left;">
+                <strong>\( n \)</strong>: Total number of observations<br>
+                <strong>\( \hat{y}_i \)</strong>: Forecasted value (prediction) at time <em>i</em><br>
+                <strong>\( y_i \)</strong>: Actual value at time <em>i</em><br>
+                <strong>\( (\hat{y}_i - y_i)^2 \)</strong>: Squared error between forecast and actual
+                </p>
+                </div>
+                
+
+
+<p style="margin-top: 20px; margin-bottom: 20px;">The smaller the MSE, the more accurate the forecast. High values indicate larger errors.</p>
+
+
+          <!-- MSE Display -->
+          <div class="mse-display" id="mse-box">
+            <div class="mse-item" style="background-color: #0f172a;">
+              <span class="mse-label">Temperature MSE</span>
+              <span class="mse-value" id="temp-mse">--</span>
+            </div>
+            <div class="mse-item" style="background-color: #0f172a;">
+              <span class="mse-label">Wind Speed MSE</span>
+              <span class="mse-value" id="wind-mse">--</span>
+            </div>
+          </div>
+          <div style="text-align: right; font-size: 9px; margin-top: 15px;">
+  <p style="text-transform: capitalize;"><strong>Data Last Calculated</strong></p>
+  <span id="last-update">--</span>
+</div>
+
+        </div>
+
+        <!-- Daily MSE Chart -->
+        <div class="chart-container" style="margin-top: 32px;">
+          <div class="chart-header">
+            <h2>Daily MSE: Forecast vs Actual</h2>
+          </div>
+            <p style="margin-bottom: 16px; color: #cbd5e1; font-size: 14px; text-align: justify;">The chart below presents the Mean Squared Error (MSE) values for each day, separately for temperature and wind speed. It highlights the daily forecasting performance, making it easier to identify days with high prediction errors. Lower bars indicate more accurate forecasts, while taller bars point to greater deviation between forecasted and actual data.</p>
+          <div class="chart-wrapper">
+            <canvas id="dailyMseChart"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  fetch('/mse-endpoint')
+    .then(res => res.json())
+    .then(data => {
+      document.getElementById("temp-mse").textContent = data.mse_temperature.toFixed(3);
+      document.getElementById("wind-mse").textContent = data.mse_wind.toFixed(3);
+
+      const now = new Date();
+      const formatted = now.toLocaleString('en-MY', {
+        day: 'numeric', month: 'long', year: 'numeric',
+        hour: '2-digit', minute: '2-digit', hour12: true
+      }).toUpperCase();
+      document.getElementById("last-update").textContent = formatted;
+    });
+
+  // Optional: Daily MSE chart (if /daily_mse endpoint exists)
+  fetch('/daily_mse')
+    .then(res => res.json())
+    .then(data => {
+      const labels = data.map(d => d.date);
+      const tempMSE = data.map(d => d.temp_mse);
+      const windMSE = data.map(d => d.wind_mse);
+
+      new Chart(document.getElementById('dailyMseChart'), {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [
+            {
+              label: 'Temp MSE',
+              data: tempMSE,
+              backgroundColor: '#3b82f6'
+            },
+            {
+              label: 'Wind MSE',
+              data: windMSE,
+              backgroundColor: '#f59e0b'
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            x: { grid: { color: '#334155' }, ticks: { color: '#cbd5e1' } },
+            y: { grid: { color: '#334155' }, ticks: { color: '#cbd5e1' } }
+          },
+          plugins: {
+            legend: { labels: { color: '#cbd5e1' } }
+          }
+        }
+      });
+    })
+    .catch(() => {
+      console.warn('Optional /daily_mse endpoint not available.');
+    });
+</script>
+</body>
+</html>
