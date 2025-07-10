@@ -97,18 +97,16 @@ def daily_mse():
 
     return result.to_json(orient='records')
 
-
 # ========== START SCHEDULER ==========
-
 def start_background_tasks():
     thread = threading.Thread(target=scheduler.start, daemon=True)
     thread.start()
 
 # ========== RUN APP ==========
+import os
 
 if __name__ == '__main__':
-    collect_weather_data()  # Run once at startup
-    start_background_tasks()  # Start scheduler in background
-    app.run(debug=True)
-        port = int(os.environ.get('PORT', 10000))
+    collect_weather_data()
+    start_background_tasks()
+    port = int(os.environ.get('PORT', 10000))
     app.run(host='0.0.0.0', port=port)
